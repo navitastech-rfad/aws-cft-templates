@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Hosted Zone for Applications
+
+##################################
+# This script creates an Route 53 Hosted Zone
+##################################
+
+Resources:
+  rHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      HostedZoneConfig:
+        Comment: Hosted Zone for EPT Applications
+      HostedZoneTags:
+        - Key: Owner
+          Value: davemm
+      Name: app
+      VPCs:
+            - VPCId: !ImportValue friab-dev-vpc-01:vpc-id
+              VPCRegion: !ImportValue friab-dev-vpc-01:vpc-region
+  rDHCPOptions:
+    Type: AWS::EC2::DHCPOptions
+    Properties:
+      DomainName: app
+      DomainNameServers:
+        - AmazonProvidedDNS
+      Tags:
+        - Key: Name
+          Value: !Join [ ":", [ !Ref "AWS::StackName", dhcp-options ] ]
+  rVPCDHCPOptionsAssociation:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Properties:
+      DhcpOptionsId: !Ref rDHCPOptions
+      VpcId: !ImportValue friab-dev-vpc-01:vpc-id
+    DependsOn:
+      - rDHCPOptions
+
+Outputs:
+    oHostedZone:
+      Value: !Ref rHostedZone
+      Export:
+        Name: !Join [ ":", [ !Ref "AWS::StackName", hosted-zone ] ]
