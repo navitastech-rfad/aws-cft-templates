@@ -1,5 +1,13 @@
 # CloudFormation Templates
 
+!!WARNING!!
+
+This set of templates has been superseded by those in the
+stack-group-managment directory. These are for historical
+purposes only.
+
+!!WARNING!!
+
 This set of scripts is designed to provide a VPC suitable for software
 development.
 
