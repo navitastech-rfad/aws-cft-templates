@@ -11,12 +11,15 @@ TARGETENV=$2
 
 REGION_NAME="us-east-1"
 
+SGNAME="${NAMESPACE}-${TARGETENV}"
+
 # stack names
-B01="${NAMESPACE}-${TARGETENV}-01-vpc"
-B02="${NAMESPACE}-${TARGETENV}-02-roles"
-B03="${NAMESPACE}-${TARGETENV}-03-secgroups"
-B04="${NAMESPACE}-${TARGETENV}-04-hosts"
-B05="${NAMESPACE}-${TARGETENV}-05-es"
+B01="${SGNAME}-01-vpc"
+B02="${SGNAME}-02-roles"
+B03="${SGNAME}-03-secgroups"
+B04="${SGNAME}-04-hosts"
+B05="${SGNAME}-05-es"
+B06="${SGNAME}-06-sns-devops"
 
 # as files are generated, they go here.
 SGDIR="stack-groups/${NAMESPACE}/${TARGETENV}"
@@ -27,12 +30,14 @@ F02="${SGDIR}/${B02}.yaml"
 F03="${SGDIR}/${B03}.yaml"
 F04="${SGDIR}/${B04}.yaml"
 F05="${SGDIR}/${B05}.yaml"
+F06="${SGDIR}/${B06}.yaml"
 
 T01="01-vpc-stack.template.yaml"
 T02="02-roles-stack.template.yaml"
 T03="03-secgroups-stack.template.yaml"
 T04="04-hosted-zone-stack.template.yaml"
 T05="05-elasticsearch-stack.template.yaml"
+T06="06-sns-devops-stack.template.yaml"
 
 VPCNAME="${B01}"
 
@@ -42,6 +47,7 @@ cp ${T02} ${F02}
 sed "s/%%VPCNAME%%/${VPCNAME}/g" ${T03} > ${F03}
 sed "s/%%VPCNAME%%/${VPCNAME}/g" ${T04} > ${F04}
 cp ${T05} ${F05}
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T06} > ${F06}
 
 aws cloudformation deploy \
   --stack-name "${B01}" \
@@ -72,3 +78,9 @@ aws cloudformation deploy \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
   --template-file ${F05}
+
+aws cloudformation deploy \
+  --stack-name "${B06}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F06}
