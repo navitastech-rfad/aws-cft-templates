@@ -5,6 +5,12 @@ Description: Hosted Zone for Applications
 # This script creates an Route 53 Hosted Zone
 ##################################
 
+Parameters:
+  pZoneName:
+    Type: String
+    Default: app
+    Description: The name of the hosted zone.
+
 Resources:
   rHostedZone:
     Type: AWS::Route53::HostedZone
@@ -14,10 +20,10 @@ Resources:
       HostedZoneTags:
         - Key: Owner
           Value: davemm
-      Name: app
+      Name: !Ref pZoneName
       VPCs:
-            - VPCId: !ImportValue %%VPCNAME%%:vpc-id
-              VPCRegion: !ImportValue %%VPCNAME%%:vpc-region
+        - VPCId: !ImportValue %%VPCNAME%%:vpc-id
+          VPCRegion: !ImportValue %%VPCNAME%%:vpc-region
   rDHCPOptions:
     Type: AWS::EC2::DHCPOptions
     Properties:
@@ -40,3 +46,8 @@ Outputs:
       Value: !Ref rHostedZone
       Export:
         Name: !Join [ ":", [ !Ref "AWS::StackName", hosted-zone ] ]
+
+    oZoneName:
+      Value: !Ref pZoneName
+      Export:
+        Name: !Join [ ":", [ !Ref "AWS::StackName", name ] ]
