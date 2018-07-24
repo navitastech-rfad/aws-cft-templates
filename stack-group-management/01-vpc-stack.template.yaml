@@ -563,3 +563,9 @@ Outputs:
     Value: !GetAtt rPrivateSubnetB.AvailabilityZone
     Export:
       Name: !Join [ ":", [ !Ref "AWS::StackName", private-subnet-b-availability-zone ] ]
+
+  oCidrBlock:
+    Description: The CIDR of the VPC.
+    Value: !Ref pCidrBlock
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", cidr-block ] ]
