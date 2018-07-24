@@ -1,0 +1,56 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: %%SGNAME%% - Aurora Mysql
+
+Parameters:
+  pMasterUsername:
+    Description: Master username for the DB instance
+    Type: String
+    Default: admin
+  pMasterPassword:
+    Description: Master username for the DB instance
+    Type: String
+    Default: SamCarDrop693!
+  pDBInstanceClass:
+    Description: Instance type for the DB instance
+    Type: String
+    Default: db.m1.small
+  pAllocatedStorage:
+    Description: Allocated storage for DB in GB
+    Type: String
+    Default: 10
+
+Resources:
+  rDBSecurityGroup:
+    Type: AWS::RDS::DBSecurityGroup
+    Properties:
+      DBSecurityGroupIngress:
+      - CIDRIP: !ImportValue %%SGNAME%%-01-vpc:cidr-block
+      GroupDescription: Allow anything in %%SGNAME%% CIDR
+  rDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: !Ref pAllocatedStorage
+      DBInstanceClass: !Ref pDBInstanceClass
+      DBSecurityGroups:
+      - !Ref rDBSecurityGroup
+      Engine: MySQL
+      MasterUsername: !Ref pMasterUsername
+      MasterUserPassword: !Ref pMasterPassword
+      StorageEncrypted: false
+    DeletionPolicy: Snapshot
+
+Outputs:
+  oStackName:
+    Description: Stack name
+    Value: !Sub '${AWS::StackName}'
+  oEndpointAddress:
+    Description: The endpoint address of the DB instance
+    Value: !GetAtt rDB.Endpoint.Address
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", endpoint-address ] ]
+  oEndpointPort:
+    Description: The endpoint port of the DB instance
+    Value: !GetAtt rDB.Endpoint.Port
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", endpoint-port ] ]
