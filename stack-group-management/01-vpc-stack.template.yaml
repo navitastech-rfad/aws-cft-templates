@@ -27,27 +27,27 @@ Parameters:
   pCidrBlock:
     Description: CIDR block for the entire VPC.
     Type: String
-    Default: 10.5.0.0/16
+    Default: %%CIDR_BASE%%.0.0/16
 
   pPublicSubnetACidrBlock:
     Description: CIDR block for public subnet A.
     Type: String
-    Default: 10.5.0.0/24
-
-  pPrivateSubnetACidrBlock:
-    Description: CIDR block for private subnet A.
-    Type: String
-    Default: 10.5.100.0/24
+    Default: %%CIDR_BASE%%.0.0/24
 
   pPublicSubnetBCidrBlock:
     Description: CIDR block for public subnet B.
     Type: String
-    Default: 10.5.1.0/24
+    Default: %%CIDR_BASE%%.1.0/24
+
+  pPrivateSubnetACidrBlock:
+    Description: CIDR block for private subnet A.
+    Type: String
+    Default: %%CIDR_BASE%%.100.0/24
 
   pPrivateSubnetBCidrBlock:
     Description: CIDR block for private subnet B.
     Type: String
-    Default: 10.5.101.0/24
+    Default: %%CIDR_BASE%%.101.0/24
 
 ################################################################################
 ################################################################################

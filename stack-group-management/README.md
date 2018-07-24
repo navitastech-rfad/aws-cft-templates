@@ -3,10 +3,17 @@
 This set of scripts is designed to provide a VPC suitable for software
 development.
 
-There are both `stacks-generate.sh` and `stacks-up.sh` scripts so that
-changes can be made to the templates separately from execution. This allows
-the YAML files to be regenerated when changes to the template are made. Then
-a stack can be updated manually.
+## stacks-generate.sh
+
+This script generates YAML files from templates. These templates are simply
+YAML files with some %%VARIABLE%% indicators where `sed` can be used for
+customization.
+
+The customized YAML files are placed into the `stack-groups` directory
+hierarchy. Each namespace and environment has its own sub-directory.
+
+Separate `stacks-up.sh` and `stacks-destroy.sh` scripts are generated and
+placed into the namespace/environemnt sub-directory.
 
 ## Preparation
 
@@ -17,26 +24,18 @@ This key pair is needed when creating a bastion and maybe other times as well.
 ## Generate Template Files
 
 ```
-./stacks-generate.sh dmm dev
-./stacks-generate.sh dmm test
-./stacks-generate.sh dmm staging
-./stacks-generate.sh dmm prod
+./stacks-generate.sh -n dmm -e dev -c 10.5
+./stacks-generate.sh -n dmm -e test -c 10.6
+./stacks-generate.sh -n dmm -e staging -c 10.7
+./stacks-generate.sh -n dmm -e prod -c 10.8
 ```
 
-## Execute Template Files
+Look in `stack-groups\dmm` to see the genereated files.
 
-```
-./stacks-up.sh dmm dev
-./stacks-up.sh dmm test
-./stacks-up.sh dmm staging
-./stacks-up.sh dmm prod
-```
+## Create a Stack Group
+
+See the `stacks-up.sh` script in the namespace/environment sub-directory.
 
 ## Destroy a Stack Group
 
-```
-./stack-destroy dmm dev
-./stack-destroy dmm test
-./stack-destroy dmm staging
-./stack-destroy dmm prod
-```
+See the `stacks-destroy.sh` script in the namespace/environment sub-directory.
