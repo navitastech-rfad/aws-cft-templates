@@ -64,7 +64,7 @@ Resources:
     Properties:
       CidrBlock: !Ref pCidrBlock
       EnableDnsSupport: true
-      EnableDnsHostnames: false
+      EnableDnsHostnames: true
       InstanceTenancy: default
       Tags:
       - Key: Name
