@@ -44,6 +44,7 @@ B05="${SGNAME}-05-es"
 B06="${SGNAME}-06-sns-devops"
 B07="${SGNAME}-07-bastion"
 B08="${SGNAME}-08-rds"
+B09="${SGNAME}-09-nexus"
 
 # as files are generated, they go here.
 SGDIR="stack-groups/${NAMESPACE}/${TARGETENV}"
@@ -57,6 +58,7 @@ F05="${SGDIR}/${B05}.yaml"
 F06="${SGDIR}/${B06}.yaml"
 F07="${SGDIR}/${B07}.yaml"
 F08="${SGDIR}/${B08}.yaml"
+F09="${SGDIR}/${B09}.yaml"
 
 T01="01-vpc-stack.template.yaml"
 T02="02-roles-stack.template.yaml"
@@ -66,6 +68,7 @@ T05="05-elasticsearch-stack.template.yaml"
 T06="06-sns-devops-stack.template.yaml"
 T07="07-bastion.template.yaml"
 T08="08-aurora-mysql.template.yaml"
+T09="09-nexus.template.yaml"
 
 VPCNAME="${B01}"
 
@@ -78,6 +81,7 @@ cp ${T05} ${F05}
 sed "s/%%SGNAME%%/${SGNAME}/g" ${T06} > ${F06}
 sed "s/%%SGNAME%%/${SGNAME}/g" ${T07} > ${F07}
 sed "s/%%SGNAME%%/${SGNAME}/g" ${T08} > ${F08}
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T09} > ${F09}
 
 cat <<EOF > ${SGDIR}/stacks-up.sh
 #!/bin/bash
@@ -129,6 +133,12 @@ aws cloudformation deploy \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
   --template-file ${F08}
+
+aws cloudformation deploy \
+  --stack-name "${B09}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F09}
 EOF
 
 cat <<EOF > ${SGDIR}/stacks-destroy.sh
@@ -157,10 +167,13 @@ aws cloudformation wait stack-delete-complete --stack-name ${B07}
 echo "Deleting Stack: ${B08}"
 aws cloudformation delete-stack --stack-name ${B08}
 aws cloudformation wait stack-delete-complete --stack-name ${B08}
+echo "Deleting Stack: ${B09}"
+aws cloudformation delete-stack --stack-name ${B09}
+aws cloudformation wait stack-delete-complete --stack-name ${B09}
 EOF
 
-chmod +x ${SGDIR}/stacks-up-${SGNAME}.sh
-chmod +x ${SGDIR}/stacks-destroy-${SGNAME}.sh
+chmod +x ${SGDIR}/stacks-up.sh
+chmod +x ${SGDIR}/stacks-destroy.sh
 
 echo ""
 echo "Generated Files"
