@@ -37,14 +37,24 @@ echo "  NAMESPACE: $NAMESPACE"
 
 # stack names
 B01="${SGNAME}-01-vpc"
-B02="${SGNAME}-02-roles"
-B03="${SGNAME}-03-secgroups"
-B04="${SGNAME}-04-hosts"
-B05="${SGNAME}-05-es"
-B06="${SGNAME}-06-sns-devops"
-B07="${SGNAME}-07-bastion"
+B02="${SGNAME}-02-sns-devops"
+B03="${SGNAME}-03-bastion"
+B04="${SGNAME}-04-roles"
+B05="${SGNAME}-05-secgroups"
+B06="${SGNAME}-06-hosts"
+B07="${SGNAME}-07-es"
 B08="${SGNAME}-08-rds"
 B09="${SGNAME}-09-nexus"
+
+
+#dev tool stack names
+B19="${SGNAME}-19-IAMRoles"
+B20="${SGNAME}-20-SG"
+B21="${SGNAME}-21-sonar"
+B22="${SGNAME}-22-keycloak"
+B23="${SGNAME}-23-kong"
+B24="${SGNAME}-24-pinpoint"
+
 
 # as files are generated, they go here.
 SGDIR="stack-groups/${NAMESPACE}/${TARGETENV}"
@@ -60,28 +70,64 @@ F07="${SGDIR}/${B07}.yaml"
 F08="${SGDIR}/${B08}.yaml"
 F09="${SGDIR}/${B09}.yaml"
 
+
+
+#dev tool stack names
+F19="${SGDIR}/${B19}.yaml"
+F20="${SGDIR}/${B20}.yaml"
+F21="${SGDIR}/${B21}.yaml"
+F22="${SGDIR}/${B22}.yaml"
+F23="${SGDIR}/${B23}.yaml"
+F24="${SGDIR}/${B24}.yaml"
+
+
+
 T01="01-vpc-stack.template.yaml"
-T02="02-roles-stack.template.yaml"
-T03="03-secgroups-stack.template.yaml"
-T04="04-hosted-zone-stack.template.yaml"
-T05="05-elasticsearch-stack.template.yaml"
-T06="06-sns-devops-stack.template.yaml"
-T07="07-bastion.template.yaml"
+T02="02-sns-devops-stack.template.yaml"
+T03="03-bastion.template.yaml"
+T04="04-roles-stack.template.yaml"
+T05="05-secgroups-stack.template.yaml"
+T06="06-hosted-zone-stack.template.yaml"
+T07="07-elasticsearch-stack.template.yaml"
 T08="08-aurora-mysql.template.yaml"
 T09="09-nexus.template.yaml"
+
+
+
+#dev tool stack names
+T19="19-IAMRoles-stack.template.yaml"
+T20="20-SecurityGroups-stack.template.yaml"
+T21="21-sonar.template.yaml"
+T22="22-keycloak.template.yaml"
+T23="23-kong.template.yaml"
+T24="24-pinpoint.template.yaml"
+
 
 VPCNAME="${B01}"
 
 mkdir -p "${SGDIR}"
 sed "s/%%VPCNAME%%/${VPCNAME}/g" ${T01} | sed "s/%%CIDR_BASE%%/${CIDR_BASE}/g" > ${F01}
-cp ${T02} ${F02}
-sed "s/%%VPCNAME%%/${VPCNAME}/g" ${T03} > ${F03}
-sed "s/%%VPCNAME%%/${VPCNAME}/g" ${T04} > ${F04}
-cp ${T05} ${F05}
-sed "s/%%SGNAME%%/${SGNAME}/g" ${T06} > ${F06}
-sed "s/%%SGNAME%%/${SGNAME}/g" ${T07} > ${F07}
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T02} > ${F02}
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T03} > ${F03}
+cp ${T04} ${F04}
+sed "s/%%VPCNAME%%/${VPCNAME}/g" ${T05} > ${F05}
+cp ${T07} ${F07}
 sed "s/%%SGNAME%%/${SGNAME}/g" ${T08} > ${F08}
 sed "s/%%SGNAME%%/${SGNAME}/g" ${T09} > ${F09}
+
+
+#dev tool stack names
+
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T19} > ${F19}
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T20} > ${F20}
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T21} > ${F21}
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T22} > ${F22}
+
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T22} > ${F22}
+
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T23} > ${F23}
+
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T24} > ${F24}
 
 cat <<EOF > ${SGDIR}/stacks-up.sh
 #!/bin/bash
@@ -139,37 +185,126 @@ aws cloudformation deploy \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
   --template-file ${F09}
+
+
+aws cloudformation deploy \
+  --stack-name "${B19}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F19}
+
+aws cloudformation deploy \
+  --stack-name "${B20}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F20}
+
+aws cloudformation deploy \
+  --stack-name "${B21}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F21}
+
+aws cloudformation deploy \
+  --stack-name "${B22}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F22}
+
+aws cloudformation deploy \
+  --stack-name "${B23}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F23}
+
+
+aws cloudformation deploy \
+  --stack-name "${B24}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F24}
+
 EOF
 
 cat <<EOF > ${SGDIR}/stacks-destroy.sh
 #!/bin/bash
-echo "Deleting Stack: ${B01}"
-aws cloudformation delete-stack --stack-name ${B01}
-aws cloudformation wait stack-delete-complete --stack-name ${B01}
-echo "Deleting Stack: ${B02}"
-aws cloudformation delete-stack --stack-name ${B02}
-aws cloudformation wait stack-delete-complete --stack-name ${B02}
-echo "Deleting Stack: ${B03}"
-aws cloudformation delete-stack --stack-name ${B03}
-aws cloudformation wait stack-delete-complete --stack-name ${B03}
-echo "Deleting Stack: ${B04}"
-aws cloudformation delete-stack --stack-name ${B04}
-aws cloudformation wait stack-delete-complete --stack-name ${B04}
-echo "Deleting Stack: ${B05}"
-aws cloudformation delete-stack --stack-name ${B05}
-aws cloudformation wait stack-delete-complete --stack-name ${B05}
-echo "Deleting Stack: ${B06}"
-aws cloudformation delete-stack --stack-name ${B06}
-aws cloudformation wait stack-delete-complete --stack-name ${B06}
-echo "Deleting Stack: ${B07}"
-aws cloudformation delete-stack --stack-name ${B07}
-aws cloudformation wait stack-delete-complete --stack-name ${B07}
-echo "Deleting Stack: ${B08}"
-aws cloudformation delete-stack --stack-name ${B08}
-aws cloudformation wait stack-delete-complete --stack-name ${B08}
+
+echo "Deleting Stack: ${B24}"
+aws cloudformation delete-stack --stack-name ${B24}
+aws cloudformation wait stack-delete-complete --stack-name ${B24}
+
+
+echo "Deleting Stack: ${B23}"
+aws cloudformation delete-stack --stack-name ${B23}
+aws cloudformation wait stack-delete-complete --stack-name ${B23}
+
+echo "Deleting Stack: ${B22}"
+aws cloudformation delete-stack --stack-name ${B22}
+aws cloudformation wait stack-delete-complete --stack-name ${B22}
+
+
+echo "Deleting Stack: ${B21}"
+aws cloudformation delete-stack --stack-name ${B21}
+aws cloudformation wait stack-delete-complete --stack-name ${B21}
+
+
+echo "Deleting Stack: ${B20}"
+aws cloudformation delete-stack --stack-name ${B20}
+aws cloudformation wait stack-delete-complete --stack-name ${B20}
+
+
+echo "Deleting Stack: ${B19}"
+aws cloudformation delete-stack --stack-name ${B19}
+aws cloudformation wait stack-delete-complete --stack-name ${B19}
+
+
+
+
 echo "Deleting Stack: ${B09}"
 aws cloudformation delete-stack --stack-name ${B09}
 aws cloudformation wait stack-delete-complete --stack-name ${B09}
+
+echo "Deleting Stack: ${B08}"
+aws cloudformation delete-stack --stack-name ${B08}
+aws cloudformation wait stack-delete-complete --stack-name ${B08}
+
+echo "Deleting Stack: ${B07}"
+aws cloudformation delete-stack --stack-name ${B07}
+aws cloudformation wait stack-delete-complete --stack-name ${B07}
+
+echo "Deleting Stack: ${B06}"
+aws cloudformation delete-stack --stack-name ${B06}
+aws cloudformation wait stack-delete-complete --stack-name ${B06}
+
+echo "Deleting Stack: ${B05}"
+aws cloudformation delete-stack --stack-name ${B05}
+aws cloudformation wait stack-delete-complete --stack-name ${B05}
+
+
+echo "Deleting Stack: ${B04}"
+aws cloudformation delete-stack --stack-name ${B04}
+aws cloudformation wait stack-delete-complete --stack-name ${B04}
+
+
+echo "Deleting Stack: ${B03}"
+aws cloudformation delete-stack --stack-name ${B03}
+aws cloudformation wait stack-delete-complete --stack-name ${B03}
+
+echo "Deleting Stack: ${B02}"
+aws cloudformation delete-stack --stack-name ${B02}
+aws cloudformation wait stack-delete-complete --stack-name ${B02}
+
+
+echo "Deleting Stack: ${B01}"
+aws cloudformation delete-stack --stack-name ${B01}
+aws cloudformation wait stack-delete-complete --stack-name ${B01}
+
+
+
+
+
+
+
 EOF
 
 chmod +x ${SGDIR}/stacks-up.sh

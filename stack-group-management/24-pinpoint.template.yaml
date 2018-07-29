@@ -1,98 +1,51 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'SSH bastion host'
-
+Description: 'PinPoint'
 Parameters:
   KeyName:
     Description: 'Pem Key for SSH Access'
     Type: String
-    Default: %%SGNAME%%
+    Default: 'NavitasDevOps'
   InstanceType:
-    Description: 'Instance type of the SSH bastion host/instance.'
+    Description: 'Instance type'
     Type: String
-    Default: 't2.nano'
-  SubDomainName:
-    Description: 'Subdomain for DNS'
-    Type: String
-    Default: 'ssh'
+    Default: 't2.large'
 
 Mappings:
   RegionMap:
     'us-east-1':
       AMI: 'ami-14c5486b'
-
 Resources:
-  rEIP:
-    Type: 'AWS::EC2::EIP'
+
+  LoadBalancer:
+    Type: 'AWS::ElasticLoadBalancing::LoadBalancer'
     Properties:
-      Domain: vpc
-  RecordSet:
-    Type: 'AWS::Route53::RecordSet'
-    Properties:
-      HostedZoneId: !ImportValue %%SGNAME%%-04-hosts:hosted-zone
-      Name: !Join ['', [ !Ref SubDomainName, ., "Fn::ImportValue" : {"Fn::Sub":'%%SGNAME%%-04-hosts:name'}, .]]
-      ResourceRecords:
-        - !Ref rEIP
-      TTL: 60
-      Type: A
+      Subnets: 
+      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-a
+      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-b
+      Listeners:
+      - InstancePort: 8080
+        InstanceProtocol: HTTP
+        LoadBalancerPort: 80
+        Protocol: HTTP
+      HealthCheck:
+        HealthyThreshold: 3
+        Interval: 30
+        Target: 'TCP:8080'
+        Timeout: 3
+        UnhealthyThreshold: 10
+      SecurityGroups:
+      - !ImportValue %%SGNAME%%-20-SG:ELBSecurityGroup
+      Scheme: 'internet-facing'
+      CrossZone: true
+
+   
+  ## Jenkins  
   Logs:
     Type: 'AWS::Logs::LogGroup'
     Properties:
       RetentionInDays: 5
-  SecurityGroup:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: 'SSH bastion host/instance'
-      SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
-        CidrIp: '0.0.0.0/0'
-      VpcId: !ImportValue %%SGNAME%%-01-vpc:vpc-id
-      Tags:
-        - Key: Name
-          Value: !Join [ ":", [ !Ref "AWS::StackName", sg-world-incoming-ssl ] ]
-  InstanceProfile:
-    Type: 'AWS::IAM::InstanceProfile'
-    Properties:
-      Path: '/'
-      Roles:
-        - !Ref IAMRole
-  IAMRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - 'ec2.amazonaws.com'
-          Action:
-            - 'sts:AssumeRole'
-      Path: '/'
-      Policies:
-      - PolicyName: 'ec2'
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-              - 'ec2:AssociateAddress'
-            Resource:
-              - '*'
-      - PolicyName: logs
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-              - 'logs:CreateLogGroup'
-              - 'logs:CreateLogStream'
-              - 'logs:PutLogEvents'
-              - 'logs:DescribeLogStreams'
-            Resource:
-              - 'arn:aws:logs:*:*:*'
+
   LaunchConfiguration:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Metadata:
@@ -201,69 +154,69 @@ Resources:
                 - '/etc/cfn/cfn-hup.conf'
                 - '/etc/cfn/hooks.d/cfn-auto-reloader.conf'
     Properties:
-      AssociatePublicIpAddress: true
+      AssociatePublicIpAddress: false
       EbsOptimized: false
-      IamInstanceProfile: !Ref InstanceProfile
+      IamInstanceProfile: !ImportValue %%SGNAME%%-19-IAMRoles:JenkinsInstanceRole
       ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref SecurityGroup
+      -  !ImportValue %%SGNAME%%-20-SG:EC2SecurityGroup
       KeyName: !Ref KeyName
       UserData:
         'Fn::Base64': !Sub |
           #!/bin/bash -ex
           trap '/opt/aws/bin/cfn-signal -e 1 --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}' ERR
           INSTANCEID=$(curl -s -m 60 http://169.254.169.254/latest/meta-data/instance-id)
-          aws --region ${AWS::Region} ec2 associate-address --instance-id $INSTANCEID --allocation-id ${rEIP.AllocationId}
+          
+          LOCAL_HOSTNAME=$(curl http://169.254.169.254/latest/meta-data/local-hostname | cut -d '.' -f1)
+          cat << EOF >> /etc/hosts
+          127.0.0.1 $LOCAL_HOSTNAME
+          EOF
+
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfiguration --region ${AWS::Region}
+
+          wget -O /tmp/install-pinpoint.sh https://raw.githubusercontent.com/navitastech-rfad/devops-config/master/pinpoint/install-pinpoint.sh
+
+          chmod 755 /tmp/install-pinpoint.sh
+
+           /tmp/install-pinpoint.sh > /tmp/install-pinpoint.log
+
           /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}
   AutoScalingGroup:
-    Type: AWS::AutoScaling::AutoScalingGroup
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
       DesiredCapacity: 1
       LaunchConfigurationName: !Ref LaunchConfiguration
-      HealthCheckGracePeriod: 300
-      HealthCheckType: EC2
+      HealthCheckGracePeriod: 600
+      LoadBalancerNames:
+      - !Ref LoadBalancer
+      HealthCheckType: ELB
       MaxSize: 1
       MinSize: 1
       Tags:
       - Key: Name
-        Value:  %%SGNAME%%-bastion
+        Value: !Sub '${AWS::StackName}-PinPoint'
         PropagateAtLaunch: true
-      NotificationConfigurations:
-      - TopicARN: !ImportValue %%SGNAME%%-06-sns-devops-TopicARN
-        NotificationTypes:
-        - autoscaling:EC2_INSTANCE_LAUNCH_ERROR
-        - autoscaling:EC2_INSTANCE_TERMINATE_ERROR
       VPCZoneIdentifier:
-      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-a
-      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-b
-    CreationPolicy:
-      ResourceSignal:
-        Count: 1
-        Timeout: PT10M
+      - !ImportValue %%SGNAME%%-01-vpc:private-subnet-a
+      - !ImportValue %%SGNAME%%-01-vpc:private-subnet-b
     UpdatePolicy:
       AutoScalingRollingUpdate:
         PauseTime: PT10M
         SuspendProcesses:
-          - HealthCheck
-          - ReplaceUnhealthy
-          - AZRebalance
-          - AlarmNotification
-          - ScheduledActions
+        - HealthCheck
+        - ReplaceUnhealthy
+        - AZRebalance
+        - AlarmNotification
+        - ScheduledActions
         WaitOnResourceSignals: true
-
 Outputs:
-  oStackName:
+  StackName:
     Description: 'Stack name.'
     Value: !Sub '${AWS::StackName}'
-  oSecurityGroup:
-    Description: 'SSH Security Group'
-    Value: !Ref SecurityGroup
+  URL:
+    Description: 'Load BalancerURL to Kong API Gateway.'
+    Value: !Sub 'http://${LoadBalancer.DNSName}'
     Export:
-      Name: !Sub '${AWS::StackName}-SecurityGroup'
-  oIPAddress:
-    Description: 'EIP for Bastion Host'
-    Value: !Ref rEIP
-    Export:
-      Name: !Sub '${AWS::StackName}-IPAddress'
+      Name: !Sub '${AWS::StackName}-DNS'
+   

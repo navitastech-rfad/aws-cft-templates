@@ -1,0 +1,190 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: %%SGNAME%% - IAM roles
+################################################################################
+################################################################################
+
+Resources:
+
+################################################################################
+#   ECS Role                                                                   #
+################################################################################
+
+
+  ECSInstanceProfile:
+      Type: 'AWS::IAM::InstanceProfile'
+      Properties:
+        Path: '/'
+        Roles:
+        - !Ref ECSRole
+
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+            Path: /
+            RoleName: !Join [ "-", [ !Ref "AWS::StackName", DevopsECSRole ] ]    
+            AssumeRolePolicyDocument: |
+                {
+                    "Statement": [{
+                        "Action": "sts:AssumeRole",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        }
+                    }]
+                }
+            Policies:
+                - PolicyName: ecs-service
+                  PolicyDocument: |
+                    {
+                        "Statement": [{
+                            "Effect": "Allow",
+                            "Action": [
+                                "ecs:CreateCluster",
+                                "ecs:DeregisterContainerInstance",
+                                "ecs:DiscoverPollEndpoint",
+                                "ecs:Poll",
+                                "ecs:RegisterContainerInstance",
+                                "ecs:StartTelemetrySession",
+                                "ecs:UpdateContainerInstancesState",
+                                "ecs:Submit*",
+                                "ecr:GetAuthorizationToken",
+                                "ecr:BatchCheckLayerAvailability",
+                                "ecr:GetDownloadUrlForLayer",
+                                "ecr:BatchGetImage",
+                                "logs:*"
+                            ],
+                            "Resource": "*"
+                        }]
+                    }
+################################################################################
+#   SSH Bastion Role                                                           #
+################################################################################
+  SSHInstanceProfile:
+      Type: 'AWS::IAM::InstanceProfile'
+      Properties:
+        Path: '/'
+        Roles:
+        - !Ref SSHRole
+  SSHRole:
+    Type: AWS::IAM::Role
+    Properties:
+            Path: /
+            RoleName:  !Join [ "-", [ !Ref "AWS::StackName", DevopsSSHRole ] ] 
+            AssumeRolePolicyDocument: |
+                {
+                    "Statement": [{
+                        "Action": "sts:AssumeRole",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        }
+                    }]
+                }
+            Policies:
+                - PolicyName: ssh-service
+                  PolicyDocument: |
+                    {
+                        "Statement": [{
+                            "Effect": "Allow",
+                            "Action": [
+                                "ec2:AssociateAddress",
+                                "logs:*"
+                            ],
+                            "Resource": "*"
+                        }]
+                    }
+################################################################################
+#   Jenkins Role                                                           #
+################################################################################
+  JenkinsInstanceProfile:
+      Type: 'AWS::IAM::InstanceProfile'
+      Properties:
+        Path: '/'
+        Roles:
+        - !Ref JenkinsRole
+
+  JenkinsRole:
+    Type: AWS::IAM::Role
+    Properties:
+            Path: /
+            RoleName: !Join [ "-", [ !Ref "AWS::StackName", DevopsJenkinsRole ] ]   
+            AssumeRolePolicyDocument: |
+                {
+                    "Statement": [{
+                        "Action": "sts:AssumeRole",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "ec2.amazonaws.com"
+                        }
+                    }]
+                }
+            Policies:
+                - PolicyName: jenkins-service
+                  PolicyDocument: |
+                    {
+                        "Statement": [{
+                            "Effect": "Allow",
+                            "Action": "*",
+                            "Resource": "*"
+                        }]
+                    }
+################################################################################
+#   ECS Service Role                                                           #
+################################################################################
+  ECSServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+                    Path: /
+                    RoleName:  !Join [ "-", [ !Ref "AWS::StackName", ECSServiceRole ] ] 
+                    AssumeRolePolicyDocument: |
+                        {
+                            "Statement": [{
+                                "Action": "sts:AssumeRole",
+                                "Effect": "Allow",
+                                "Principal": {
+                                    "Service": "ecs.amazonaws.com"
+                                }
+                            }]
+                        }
+                    Policies:
+                        - PolicyName: ecs-service
+                          PolicyDocument: |
+                            {
+                                "Statement": [{
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:AuthorizeSecurityGroupIngress",
+                                        "ec2:Describe*",
+                                        "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                                            "elasticloadbalancing:Describe*",
+                                            "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+                                            "elasticloadbalancing:DeregisterTargets",
+                                            "elasticloadbalancing:DescribeTargetGroups",
+                                            "elasticloadbalancing:DescribeTargetHealth",
+                                            "elasticloadbalancing:RegisterTargets"
+                                    ],
+                                    "Resource": "*"
+                                }]
+                            }
+
+Outputs:
+  ECSInstanceRole:
+    Description: 'ECS Cluster Instance Role'
+    Value: !GetAtt ECSInstanceProfile.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", ECSInstanceRole ] ]
+  SSHInstanceRole:
+    Description: 'SSH Instance Role'
+    Value: !GetAtt ECSInstanceProfile.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", SSHInstanceRole ] ]
+  JenkinsInstanceRole:
+    Description: 'Jenkins Instance Role'
+    Value: !GetAtt JenkinsInstanceProfile.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", JenkinsInstanceRole ] ]
+  ECSServiceRole:
+    Description: 'Jenkins Instance Role'
+    Value: !GetAtt ECSServiceRole.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", ECSServiceRole ] ]

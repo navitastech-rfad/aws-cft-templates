@@ -27,7 +27,7 @@ Resources:
   rDHCPOptions:
     Type: AWS::EC2::DHCPOptions
     Properties:
-      DomainName: app
+      DomainName: app2
       DomainNameServers:
         - AmazonProvidedDNS
       Tags:
