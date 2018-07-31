@@ -54,6 +54,12 @@ B21="${SGNAME}-21-sonar"
 B22="${SGNAME}-22-keycloak"
 B23="${SGNAME}-23-kong"
 B24="${SGNAME}-24-pinpoint"
+B25="${SGNAME}-25-rds-postgres"
+B26="${SGNAME}-26-jenkins"
+
+B27="${SGNAME}-27-ecs-cluster"
+B30="${SGNAME}-30-ecs-service"
+
 
 
 # as files are generated, they go here.
@@ -79,6 +85,13 @@ F21="${SGDIR}/${B21}.yaml"
 F22="${SGDIR}/${B22}.yaml"
 F23="${SGDIR}/${B23}.yaml"
 F24="${SGDIR}/${B24}.yaml"
+F25="${SGDIR}/${B25}.yaml"
+F26="${SGDIR}/${B26}.yaml"
+
+
+F27="${SGDIR}/${B27}.yaml"
+F30="${SGDIR}/${B30}.yaml"
+
 
 
 
@@ -101,6 +114,12 @@ T21="21-sonar.template.yaml"
 T22="22-keycloak.template.yaml"
 T23="23-kong.template.yaml"
 T24="24-pinpoint.template.yaml"
+T25="25-rds-postgresql-stack.template.yaml"
+T26="26-jenkins-stack.template.yaml"
+
+T27="27-ecs-cluster-stack.template.yaml"
+T30="30-ecs-app.template.yaml"
+
 
 
 VPCNAME="${B01}"
@@ -128,6 +147,13 @@ sed "s/%%SGNAME%%/${SGNAME}/g" ${T22} > ${F22}
 sed "s/%%SGNAME%%/${SGNAME}/g" ${T23} > ${F23}
 
 sed "s/%%SGNAME%%/${SGNAME}/g" ${T24} > ${F24}
+
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T25} > ${F25}
+
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T26} > ${F26}
+
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T27} > ${F27}
+sed "s/%%SGNAME%%/${SGNAME}/g" ${T30} > ${F30}
 
 cat <<EOF > ${SGDIR}/stacks-up.sh
 #!/bin/bash
@@ -162,25 +188,25 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --template-file ${F05}
 
-aws cloudformation deploy \
+#aws cloudformation deploy \
   --stack-name "${B06}" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
   --template-file ${F06}
 
-aws cloudformation deploy \
+#aws cloudformation deploy \
   --stack-name "${B07}" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
   --template-file ${F07}
 
-aws cloudformation deploy \
+#aws cloudformation deploy \
   --stack-name "${B08}" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
   --template-file ${F08}
 
-aws cloudformation deploy \
+#aws cloudformation deploy \
   --stack-name "${B09}" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
@@ -224,10 +250,49 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --template-file ${F24}
 
+aws cloudformation deploy \
+  --stack-name "${B25}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F25}
+
+
+aws cloudformation deploy \
+  --stack-name "${B26}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F26}
+
+
+
+  aws cloudformation deploy \
+  --stack-name "${B27}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F27}
+
+
+
 EOF
 
 cat <<EOF > ${SGDIR}/stacks-destroy.sh
 #!/bin/bash
+
+echo "Deleting Stack: ${B27}"
+aws cloudformation delete-stack --stack-name ${B27}
+aws cloudformation wait stack-delete-complete --stack-name ${B27}
+
+
+echo "Deleting Stack: ${B26}"
+aws cloudformation delete-stack --stack-name ${B26}
+aws cloudformation wait stack-delete-complete --stack-name ${B26}
+
+
+echo "Deleting Stack: ${B25}"
+aws cloudformation delete-stack --stack-name ${B25}
+aws cloudformation wait stack-delete-complete --stack-name ${B25}
+
+
 
 echo "Deleting Stack: ${B24}"
 aws cloudformation delete-stack --stack-name ${B24}

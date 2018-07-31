@@ -1,89 +1,54 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'SSH bastion host'
+Description: 'Jenkins Master'
 
 Parameters:
   KeyName:
     Description: 'Pem Key for SSH Access'
     Type: String
-    Default: %%SGNAME%%
+    Default: 'NavitasDevOps'
   InstanceType:
-    Description: 'Instance type of the SSH bastion host/instance.'
+    Description: 'Instance type'
     Type: String
-    Default: t2.small
-  SubDomainName:
-    Description: 'Subdomain for DNS'
-    Type: String
-    Default: nexus
+    Default: 't2.large'
 
 Mappings:
   RegionMap:
     'us-east-1':
       AMI: 'ami-14c5486b'
-
+Conditions:
+  HasKeyName: !Not [!Equals [!Ref KeyName, '']]
 Resources:
-  rEIP:
-    Type: 'AWS::EC2::EIP'
+  
+
+# ELB
+  LoadBalancer:
+    Type: 'AWS::ElasticLoadBalancing::LoadBalancer'
     Properties:
-      Domain: vpc
+      Subnets: 
+      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-a
+      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-b
+      Listeners:
+      - InstancePort: 8080
+        InstanceProtocol: HTTP
+        LoadBalancerPort: 80
+        Protocol: HTTP
+      HealthCheck:
+        HealthyThreshold: 3
+        Interval: 30
+        Target: 'TCP:8080'
+        Timeout: 3
+        UnhealthyThreshold: 10
+      SecurityGroups:
+      - !ImportValue %%SGNAME%%-20-SG:ELBSecurityGroup
+      Scheme: 'internet-facing'
+      CrossZone: true
+  ## Jenkins EC2 
   Logs:
     Type: 'AWS::Logs::LogGroup'
     Properties:
       RetentionInDays: 5
-  InstanceProfile:
-    Type: 'AWS::IAM::InstanceProfile'
-    Properties:
-      Path: '/'
-      Roles:
-        - !Ref IAMRole
-  IAMRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - 'ec2.amazonaws.com'
-          Action:
-            - 'sts:AssumeRole'
-      Path: '/'
-      Policies:
-      - PolicyName: 'ec2'
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-              - 'ec2:AssociateAddress'
-            Resource:
-              - '*'
-      - PolicyName: logs
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-              - 'logs:CreateLogGroup'
-              - 'logs:CreateLogStream'
-              - 'logs:PutLogEvents'
-              - 'logs:DescribeLogStreams'
-            Resource:
-              - 'arn:aws:logs:*:*:*'
-  rWorldIncomingNexusSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: "Allow 8081 by Everyone."
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8081
-          ToPort: 8081
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Join [ ":", [ !Ref "AWS::StackName", sg-world-incoming-nexus ] ]
-      VpcId: !ImportValue %%SGNAME%%-01-vpc:vpc-id
+
   LaunchConfiguration:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Metadata:
@@ -192,78 +157,68 @@ Resources:
                 - '/etc/cfn/cfn-hup.conf'
                 - '/etc/cfn/hooks.d/cfn-auto-reloader.conf'
     Properties:
-      AssociatePublicIpAddress: true
+      AssociatePublicIpAddress: false
       EbsOptimized: false
-      IamInstanceProfile: !Ref InstanceProfile
+      IamInstanceProfile: !ImportValue %%SGNAME%%-19-IAMRoles:JenkinsInstanceRole
       ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
       InstanceType: !Ref InstanceType
       SecurityGroups:
-      - !ImportValue %%SGNAME%%-03-secgroups:world-incoming-ssh-sg
-      - !Ref rWorldIncomingNexusSecurityGroup
-      KeyName: !Ref KeyName
+      -  !ImportValue %%SGNAME%%-20-SG:EC2SecurityGroup
+      KeyName: !If [HasKeyName, !Ref KeyName, !Ref 'AWS::NoValue']
       UserData:
         'Fn::Base64': !Sub |
           #!/bin/bash -ex
           trap '/opt/aws/bin/cfn-signal -e 1 --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}' ERR
           INSTANCEID=$(curl -s -m 60 http://169.254.169.254/latest/meta-data/instance-id)
-          aws --region ${AWS::Region} ec2 associate-address --instance-id $INSTANCEID --allocation-id ${rEIP.AllocationId}
-          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfiguration --region ${AWS::Region}
-          echo "**** START"
-          cat << EOF >> /etc/security/limits.d/nexus.conf
-          # <domain> <type> <item>  <value>
-              *       soft  nofile  65536
-              *       hard  nofile  65536
+          
+          LOCAL_HOSTNAME=$(curl http://169.254.169.254/latest/meta-data/local-hostname | cut -d '.' -f1)
+          cat << EOF >> /etc/hosts
+          127.0.0.1 $LOCAL_HOSTNAME
           EOF
-          yum update -y
-          yum install -y docker
-          service docker start
-          docker pull sonatype/nexus3
-          docker run --restart always -d -p 8081:8081 --name nexus sonatype/nexus3
-          usermod -a -G docker ec2-user
-          echo "**** END"
+
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfiguration --region ${AWS::Region}
+
+          wget -O /tmp/install-jenkins.sh https://raw.githubusercontent.com/navitastech-rfad/devops-config/master/jenkins/install-jenkins.sh
+
+          chmod 755 /tmp/install-jenkins.sh
+
+           /tmp/install-jenkins.sh > /tmp/jenkins-install.log
+
           /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}
   AutoScalingGroup:
-    Type: AWS::AutoScaling::AutoScalingGroup
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
       DesiredCapacity: 1
       LaunchConfigurationName: !Ref LaunchConfiguration
       HealthCheckGracePeriod: 300
-      HealthCheckType: EC2
+      LoadBalancerNames:
+      - !Ref LoadBalancer
+      HealthCheckType: ELB
       MaxSize: 1
       MinSize: 1
       Tags:
       - Key: Name
-        Value:  %%SGNAME%%-nexus
+        Value:  !Sub '${AWS::StackName}-Jenkins'
         PropagateAtLaunch: true
-      NotificationConfigurations:
-      - TopicARN: !ImportValue %%SGNAME%%-06-sns-devops-TopicARN
-        NotificationTypes:
-        - autoscaling:EC2_INSTANCE_LAUNCH_ERROR
-        - autoscaling:EC2_INSTANCE_TERMINATE_ERROR
       VPCZoneIdentifier:
-      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-a
-      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-b
-    CreationPolicy:
-      ResourceSignal:
-        Count: 1
-        Timeout: PT10M
+      - !ImportValue %%SGNAME%%-01-vpc:private-subnet-a
+      - !ImportValue %%SGNAME%%-01-vpc:private-subnet-b
     UpdatePolicy:
       AutoScalingRollingUpdate:
         PauseTime: PT10M
         SuspendProcesses:
-          - HealthCheck
-          - ReplaceUnhealthy
-          - AZRebalance
-          - AlarmNotification
-          - ScheduledActions
+        - HealthCheck
+        - ReplaceUnhealthy
+        - AZRebalance
+        - AlarmNotification
+        - ScheduledActions
         WaitOnResourceSignals: true
-
 Outputs:
-  oStackName:
+  StackName:
     Description: 'Stack name.'
     Value: !Sub '${AWS::StackName}'
-  oIPAddress:
-    Description: 'EIP for Nexus'
-    Value: !Ref rEIP
+  ELBURL:
+    Description: 'Load BalancerURL to the Jenkins Master.'
+    Value: !Sub 'http://${LoadBalancer.DNSName}'
     Export:
-      Name: !Sub '${AWS::StackName}-IPAddress'
+      Name: !Sub '${AWS::StackName}-ELBURL'

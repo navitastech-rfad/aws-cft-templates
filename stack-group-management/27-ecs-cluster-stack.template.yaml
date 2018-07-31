@@ -1,89 +1,35 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'SSH bastion host'
-
+Description: 'ECS Cluster'
+ 
 Parameters:
+  ClusterName:
+    Description: An cluster name that will be prefixed to resource names
+    Type: String
+    Default: 'DevAppCluster'
   KeyName:
     Description: 'Pem Key for SSH Access'
     Type: String
-    Default: %%SGNAME%%
+    Default: 'NavitasDevOps'
   InstanceType:
-    Description: 'Instance type of the SSH bastion host/instance.'
+    Description: 'Instance type'
     Type: String
-    Default: t2.small
-  SubDomainName:
-    Description: 'Subdomain for DNS'
-    Type: String
-    Default: nexus
-
+    Default: 'c4.large'
 Mappings:
   RegionMap:
     'us-east-1':
-      AMI: 'ami-14c5486b'
+      AMI: ami-5253c32d
 
 Resources:
-  rEIP:
-    Type: 'AWS::EC2::EIP'
-    Properties:
-      Domain: vpc
   Logs:
     Type: 'AWS::Logs::LogGroup'
     Properties:
       RetentionInDays: 5
-  InstanceProfile:
-    Type: 'AWS::IAM::InstanceProfile'
+  ECSCluster:
+    Type: AWS::ECS::Cluster
     Properties:
-      Path: '/'
-      Roles:
-        - !Ref IAMRole
-  IAMRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - 'ec2.amazonaws.com'
-          Action:
-            - 'sts:AssumeRole'
-      Path: '/'
-      Policies:
-      - PolicyName: 'ec2'
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-              - 'ec2:AssociateAddress'
-            Resource:
-              - '*'
-      - PolicyName: logs
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-              - 'logs:CreateLogGroup'
-              - 'logs:CreateLogStream'
-              - 'logs:PutLogEvents'
-              - 'logs:DescribeLogStreams'
-            Resource:
-              - 'arn:aws:logs:*:*:*'
-  rWorldIncomingNexusSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: "Allow 8081 by Everyone."
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8081
-          ToPort: 8081
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Join [ ":", [ !Ref "AWS::StackName", sg-world-incoming-nexus ] ]
-      VpcId: !ImportValue %%SGNAME%%-01-vpc:vpc-id
+        ClusterName: !Ref ClusterName
+
   LaunchConfiguration:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Metadata:
@@ -192,78 +138,107 @@ Resources:
                 - '/etc/cfn/cfn-hup.conf'
                 - '/etc/cfn/hooks.d/cfn-auto-reloader.conf'
     Properties:
-      AssociatePublicIpAddress: true
+      AssociatePublicIpAddress: false
       EbsOptimized: false
-      IamInstanceProfile: !Ref InstanceProfile
-      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
-      InstanceType: !Ref InstanceType
+      KeyName: NavitasDevOps
       SecurityGroups:
-      - !ImportValue %%SGNAME%%-03-secgroups:world-incoming-ssh-sg
-      - !Ref rWorldIncomingNexusSecurityGroup
-      KeyName: !Ref KeyName
+      - !ImportValue %%SGNAME%%-20-SG:EC2SecurityGroup
+      IamInstanceProfile: !ImportValue %%SGNAME%%-19-IAMRoles:ECSInstanceRole
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      InstanceType: c4.large
       UserData:
         'Fn::Base64': !Sub |
           #!/bin/bash -ex
           trap '/opt/aws/bin/cfn-signal -e 1 --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}' ERR
           INSTANCEID=$(curl -s -m 60 http://169.254.169.254/latest/meta-data/instance-id)
-          aws --region ${AWS::Region} ec2 associate-address --instance-id $INSTANCEID --allocation-id ${rEIP.AllocationId}
-          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfiguration --region ${AWS::Region}
-          echo "**** START"
-          cat << EOF >> /etc/security/limits.d/nexus.conf
-          # <domain> <type> <item>  <value>
-              *       soft  nofile  65536
-              *       hard  nofile  65536
+          
+          LOCAL_HOSTNAME=$(curl http://169.254.169.254/latest/meta-data/local-hostname | cut -d '.' -f1)
+          cat << EOF >> /etc/hosts
+          127.0.0.1 $LOCAL_HOSTNAME
           EOF
-          yum update -y
-          yum install -y docker
-          service docker start
-          docker pull sonatype/nexus3
-          docker run --restart always -d -p 8081:8081 --name nexus sonatype/nexus3
-          usermod -a -G docker ec2-user
-          echo "**** END"
+
+          echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfiguration --region ${AWS::Region}
+
+      
+
           /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}
   AutoScalingGroup:
-    Type: AWS::AutoScaling::AutoScalingGroup
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
-      DesiredCapacity: 1
+      DesiredCapacity: 2
       LaunchConfigurationName: !Ref LaunchConfiguration
       HealthCheckGracePeriod: 300
       HealthCheckType: EC2
-      MaxSize: 1
-      MinSize: 1
+      MaxSize: 4
+      MinSize: 2
       Tags:
       - Key: Name
-        Value:  %%SGNAME%%-nexus
+        Value: !Sub '${AWS::StackName}-ECS'
         PropagateAtLaunch: true
-      NotificationConfigurations:
-      - TopicARN: !ImportValue %%SGNAME%%-06-sns-devops-TopicARN
-        NotificationTypes:
-        - autoscaling:EC2_INSTANCE_LAUNCH_ERROR
-        - autoscaling:EC2_INSTANCE_TERMINATE_ERROR
-      VPCZoneIdentifier:
-      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-a
-      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-b
-    CreationPolicy:
-      ResourceSignal:
-        Count: 1
-        Timeout: PT10M
+      VPCZoneIdentifier: 
+      - !ImportValue %%SGNAME%%-01-vpc:private-subnet-a
+      - !ImportValue %%SGNAME%%-01-vpc:private-subnet-b
     UpdatePolicy:
       AutoScalingRollingUpdate:
         PauseTime: PT10M
         SuspendProcesses:
-          - HealthCheck
-          - ReplaceUnhealthy
-          - AZRebalance
-          - AlarmNotification
-          - ScheduledActions
+        - HealthCheck
+        - ReplaceUnhealthy
+        - AZRebalance
+        - AlarmNotification
+        - ScheduledActions
         WaitOnResourceSignals: true
+  LoadBalancer:
+        Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+        Properties:
+            Name: !Ref ClusterName
+            Subnets:
+            - !ImportValue %%SGNAME%%-01-vpc:public-subnet-a
+            - !ImportValue %%SGNAME%%-01-vpc:public-subnet-b
+            SecurityGroups: 
+                - !ImportValue %%SGNAME%%-20-SG:ELBSecurityGroup
+            Tags: 
+                - Key: Name
+                  Value: !Ref ClusterName
 
+  LoadBalancerListener:
+        Type: AWS::ElasticLoadBalancingV2::Listener
+        Properties:
+            LoadBalancerArn: !Ref LoadBalancer
+            Port: 80
+            Protocol: HTTP 
+            DefaultActions: 
+                - Type: forward
+                  TargetGroupArn: !Ref DefaultTargetGroup
+  DefaultTargetGroup:
+        Type: AWS::ElasticLoadBalancingV2::TargetGroup
+        Properties:
+            Name: !Sub '${AWS::StackName}-dftg'
+            VpcId: !ImportValue %%SGNAME%%-01-vpc:vpc-id
+            Port: 80
+            Protocol: HTTP
 Outputs:
-  oStackName:
-    Description: 'Stack name.'
-    Value: !Sub '${AWS::StackName}'
-  oIPAddress:
-    Description: 'EIP for Nexus'
-    Value: !Ref rEIP
+  Cluster:
+    Description: A reference to the ECS cluster
+    Value: !Ref ECSCluster
     Export:
-      Name: !Sub '${AWS::StackName}-IPAddress'
+      Name: !Join [ ":", [ !Ref "AWS::StackName", ECSCluster ] ]
+  LoadBalancer:
+    Description: A reference to the Application Load Balancer
+    Value: !Ref LoadBalancer
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", LoadBalancer ] ]
+
+  LoadBalancerUrl:
+    Description: The URL of the ALB
+    Value: !GetAtt LoadBalancer.DNSName
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", LoadBalancerUrl ] ]
+
+  Listener:
+    Description: A reference to a port 80 listener
+    Value: !Ref LoadBalancerListener  
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", LoadBalancerListener ] ]

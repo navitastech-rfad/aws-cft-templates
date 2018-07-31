@@ -1,0 +1,87 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  %%SGNAME%%  postgresql 
+################################################################################
+################################################################################
+
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+    - Label:
+        default: 'RDS Parameters'
+      Parameters:
+      - DBInstanceClass
+      - DBName
+      - DBMasterUsername
+      - DBMasterUserPassword
+    - Label:
+        default: 'EC2 Parameters'
+      Parameters:
+      - VpcId
+      - PrivateSubnets
+      - PublicSubnets
+
+################################################################################
+################################################################################
+
+Parameters:
+  DBAllocatedStorage:
+    Description: 'The allocated storage size, specified in GB'
+    Type: Number
+    Default: 10
+    MinValue: 5
+    MaxValue: 16384
+  DBInstanceClass:
+    Description: 'The instance type of database server.'
+    Type: String
+    Default: 'db.t2.medium'
+  DBName:
+    Description: 'Name of the database '
+    Type: String
+    Default: 'devdb1'
+  DBMasterUsername:
+    Description: 'The master user name for the DB instance'
+    Type: String
+    Default: 'dbadmin'
+  DBMasterUserPassword:
+    Description: 'The master password for the DB instance'
+    Type: String
+    NoEcho: true
+    Default: 'test12345'
+
+################################################################################
+################################################################################
+
+Resources:
+  
+  DBSubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: !Ref 'AWS::StackName'
+      SubnetIds: 
+      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-a
+      - !ImportValue %%SGNAME%%-01-vpc:public-subnet-b
+
+  DBInstance:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      AllocatedStorage: !Ref DBAllocatedStorage
+      DBInstanceClass: !Ref DBInstanceClass
+      DBName:  !Ref DBName
+      DBInstanceIdentifier: !Ref DBName
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      Engine: postgres
+      EngineVersion: '9.6.5'
+      MasterUsername: !Ref DBMasterUsername
+      MasterUserPassword:  !Ref DBMasterUserPassword
+      VPCSecurityGroups:
+      - !ImportValue %%SGNAME%%-20-SG:PGSQLSecurityGroup
+Outputs:
+  StackName:
+    Description: 'Stack name.'
+    Value: !Sub '${AWS::StackName}'
+  DNSName:
+    Description: 'The connection endpoint for the database.'
+    Value: !GetAtt 'DBInstance.Endpoint.Address'
+    Export:
+      Name: !Sub '${AWS::StackName}-DNSName'
