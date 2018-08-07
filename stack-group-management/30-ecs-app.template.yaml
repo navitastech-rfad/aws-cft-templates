@@ -6,6 +6,10 @@ Parameters:
     Description: 'Name of the app'
     Type: String
     Default: 'main'
+  ClusterName:
+    Description: 'Name of the Cluster'
+    Type: String
+    Default: 'main'
   ContainerPort:
     Description: 'container port'
     Type: String
@@ -19,6 +23,12 @@ Parameters:
     Description: 'the path pattern will be /service/*.  '
     Type: String
     Default: '/*'
+    ConstraintDescription: 'Must not be longer than 255'
+    MaxLength: 255
+  HealthCheckPath:
+    Description: 'the path pattern will be /*.  '
+    Type: String
+    Default: '/'
     ConstraintDescription: 'Must not be longer than 255'
     MaxLength: 255
   LoadBalancerDeregistrationDelay:
@@ -39,7 +49,7 @@ Resources:
     Type: AWS::ECS::Service
     DependsOn: ListenerRule
     Properties: 
-      Cluster: !ImportValue %%SGNAME%%-27-ecs-cluster:ECSCluster
+      Cluster: !Ref ClusterName
       Role: !ImportValue %%SGNAME%%-19-IAMRoles:ECSServiceRole
       DesiredCount: 1
       TaskDefinition: !Ref TaskDefinition
@@ -68,7 +78,7 @@ Resources:
       Matcher: 
           HttpCode: 200-299
       HealthCheckIntervalSeconds: 10
-      HealthCheckPath: /
+      HealthCheckPath: !Ref HealthCheckPath
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
