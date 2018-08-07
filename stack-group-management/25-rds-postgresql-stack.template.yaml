@@ -38,16 +38,14 @@ Parameters:
   DBName:
     Description: 'Name of the database '
     Type: String
-    Default: 'devdb1'
   DBMasterUsername:
     Description: 'The master user name for the DB instance'
     Type: String
-    Default: 'dbadmin'
   DBMasterUserPassword:
     Description: 'The master password for the DB instance'
     Type: String
     NoEcho: true
-    Default: 'test12345'
+     
 
 ################################################################################
 ################################################################################

@@ -158,6 +158,11 @@ sed "s/%%SGNAME%%/${SGNAME}/g" ${T30} > ${F30}
 cat <<EOF > ${SGDIR}/stacks-up.sh
 #!/bin/bash
 
+
+export ENVIRONMENT=$TARGETENV
+
+
+
 aws cloudformation deploy \
   --stack-name "${B01}" \
   --region $REGION_NAME \
@@ -225,52 +230,72 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --template-file ${F20}
 
+if [ "\${ENVIRONMENT}" = "dev" ]; then
+  
+
 aws cloudformation deploy \
   --stack-name "${B21}" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
-  --template-file ${F21}
+  --template-file ${F21} > /dev/null 2>&1 &
 
 aws cloudformation deploy \
   --stack-name "${B22}" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
-  --template-file ${F22}
+  --template-file ${F22} > /dev/null 2>&1 &
 
 aws cloudformation deploy \
   --stack-name "${B23}" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
-  --template-file ${F23}
+  --template-file ${F23} > /dev/null 2>&1 &
 
 
 aws cloudformation deploy \
   --stack-name "${B24}" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
-  --template-file ${F24}
+  --template-file ${F24} > /dev/null 2>&1 &
 
-aws cloudformation deploy \
-  --stack-name "${B25}" \
-  --region $REGION_NAME \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --template-file ${F25}
+
 
 
 aws cloudformation deploy \
   --stack-name "${B26}" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
-  --template-file ${F26}
+  --template-file ${F26} > /dev/null 2>&1 &
+
+
+fi
+
+
+
+aws cloudformation deploy \
+  --stack-name "${B25}" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F25} \
+  --parameter-overrides DBName=${TARGETENV}db DBMasterUsername=dbadmin DBMasterUserPassword=test12345  > /dev/null 2>&1 &
+
 
 
 
   aws cloudformation deploy \
-  --stack-name "${B27}" \
+  --stack-name "${B27}-API" \
   --region $REGION_NAME \
   --capabilities CAPABILITY_NAMED_IAM \
-  --template-file ${F27}
+  --template-file ${F27} \
+  --parameter-overrides ClusterName=${TARGETENV}-APICluster > /dev/null 2>&1 &
 
+
+  aws cloudformation deploy \
+  --stack-name "${B27}-WEB" \
+  --region $REGION_NAME \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --template-file ${F27} \
+  --parameter-overrides ClusterName=${TARGETENV}-WebCluster > /dev/null 2>&1 &
 
 
 EOF
@@ -278,40 +303,52 @@ EOF
 cat <<EOF > ${SGDIR}/stacks-destroy.sh
 #!/bin/bash
 
-echo "Deleting Stack: ${B27}"
-aws cloudformation delete-stack --stack-name ${B27}
-aws cloudformation wait stack-delete-complete --stack-name ${B27}
+export ENVIRONMENT=$TARGETENV
 
+
+
+
+echo "Deleting Stack: ${B27}-API"
+aws cloudformation delete-stack --stack-name ${B27}-API
+aws cloudformation wait stack-delete-complete --stack-name ${B27}-API > /dev/null 2>&1 &
+
+echo "Deleting Stack: ${B27}-Web"
+aws cloudformation delete-stack --stack-name ${B27}-WEB
+aws cloudformation wait stack-delete-complete --stack-name ${B27}-WEB > /dev/null 2>&1 &
+
+
+if [ "\${ENVIRONMENT}" = "dev" ]; then
+  
 
 echo "Deleting Stack: ${B26}"
 aws cloudformation delete-stack --stack-name ${B26}
-aws cloudformation wait stack-delete-complete --stack-name ${B26}
+aws cloudformation wait stack-delete-complete --stack-name ${B26} 
 
 
 echo "Deleting Stack: ${B25}"
 aws cloudformation delete-stack --stack-name ${B25}
-aws cloudformation wait stack-delete-complete --stack-name ${B25}
+aws cloudformation wait stack-delete-complete --stack-name ${B25}  
 
 
 
 echo "Deleting Stack: ${B24}"
 aws cloudformation delete-stack --stack-name ${B24}
-aws cloudformation wait stack-delete-complete --stack-name ${B24}
+aws cloudformation wait stack-delete-complete --stack-name ${B24} 
 
 
 echo "Deleting Stack: ${B23}"
 aws cloudformation delete-stack --stack-name ${B23}
-aws cloudformation wait stack-delete-complete --stack-name ${B23}
+aws cloudformation wait stack-delete-complete --stack-name ${B23}  
 
 echo "Deleting Stack: ${B22}"
 aws cloudformation delete-stack --stack-name ${B22}
-aws cloudformation wait stack-delete-complete --stack-name ${B22}
-
+aws cloudformation wait stack-delete-complete --stack-name ${B22}  
 
 echo "Deleting Stack: ${B21}"
 aws cloudformation delete-stack --stack-name ${B21}
-aws cloudformation wait stack-delete-complete --stack-name ${B21}
+aws cloudformation wait stack-delete-complete --stack-name ${B21}  
 
+fi
 
 echo "Deleting Stack: ${B20}"
 aws cloudformation delete-stack --stack-name ${B20}

@@ -111,6 +111,23 @@ Resources:
     Properties:
       Domain: vpc
 
+  rDHCPOptions:
+    Type: AWS::EC2::DHCPOptions
+    Properties:
+      DomainName: ec2.internal
+      DomainNameServers:
+        - AmazonProvidedDNS
+      Tags:
+        - Key: Name
+          Value: !Join [ ":", [ !Ref "AWS::StackName", dhcp-options ] ]
+  rVPCDHCPOptionsAssociation:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Properties:
+      DhcpOptionsId: !Ref rDHCPOptions
+      VpcId: !Ref rVPC
+    DependsOn:
+      - rDHCPOptions
+
   #-----------------------------------------------------------------------------
   # Create all subnets
   #-----------------------------------------------------------------------------

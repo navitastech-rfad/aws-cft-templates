@@ -6,7 +6,6 @@ Parameters:
   ClusterName:
     Description: An cluster name that will be prefixed to resource names
     Type: String
-    Default: 'DevAppCluster'
   KeyName:
     Description: 'Pem Key for SSH Access'
     Type: String
@@ -167,12 +166,12 @@ Resources:
   AutoScalingGroup:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
-      DesiredCapacity: 2
+      DesiredCapacity: 1
       LaunchConfigurationName: !Ref LaunchConfiguration
       HealthCheckGracePeriod: 300
       HealthCheckType: EC2
       MaxSize: 4
-      MinSize: 2
+      MinSize: 1
       Tags:
       - Key: Name
         Value: !Sub '${AWS::StackName}-ECS'
