@@ -50,6 +50,7 @@ Resources:
     DependsOn: ListenerRule
     Properties: 
       Cluster: !Ref ClusterName
+      ServiceName: !Ref ContainerName
       Role: !ImportValue %%SGNAME%%-19-IAMRoles:ECSServiceRole
       DesiredCount: 1
       TaskDefinition: !Ref TaskDefinition

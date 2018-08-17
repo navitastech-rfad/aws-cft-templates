@@ -162,6 +162,11 @@ Resources:
       IamInstanceProfile: !ImportValue %%SGNAME%%-19-IAMRoles:JenkinsInstanceRole
       ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
       InstanceType: !Ref InstanceType
+      BlockDeviceMappings: 
+      - DeviceName: "/dev/sdf"
+        Ebs: 
+          VolumeSize: "100"
+          VolumeType: "gp2"
       SecurityGroups:
       -  !ImportValue %%SGNAME%%-20-SG:EC2SecurityGroup
       KeyName: !If [HasKeyName, !Ref KeyName, !Ref 'AWS::NoValue']
